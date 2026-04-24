@@ -1,1 +1,2 @@
 # MECALUX-HackUpc-2026
+#
