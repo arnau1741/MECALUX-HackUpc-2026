@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mecalux 3D Twin - Warehouse Perimeter</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1e1e2e; color: white; font-family: sans-serif; }
+        #ui-panel {
+            position: absolute; top: 10px; left: 10px; width: 320px; 
+            background: rgba(30, 30, 46, 0.9); padding: 15px; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 100; max-height: 90vh; overflow-y: auto;
+        }
+        textarea { width: 100%; height: 50px; background: #11111b; color: #a6e3a1; border: 1px solid #585b70; box-sizing: border-box; margin-bottom: 8px; font-family: monospace; font-size: 11px;}
+        button { width: 100%; background: #f5c2e7; border: none; padding: 12px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.2s; color: #11111b; }
+        button:hover { background: #cba6f7; }
+        h3 { margin: 0 0 10px 0; color: #f5c2e7; font-size: 16px; text-align: center; }
+        label { font-size: 11px; color: #bac2de; font-weight: bold; display: block; margin-bottom: 3px;}
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h3>Mecalux 3D Viz 🏭</h3>
+        
+        <label>1. Warehouse (Paredes)</label>
+        <textarea id="whText" placeholder="0,0
+10000,0..."></textarea>
+        
+        <label>2. Ceiling (Techo)</label>
+        <textarea id="ceilingText" placeholder="X, Height..."></textarea>
+
+        <label>3. Bay Types</label>
+        <textarea id="baysText" placeholder="Id, W, D, H..."></textarea>
+
+        <label>4. C++ Output</label>
+        <textarea id="csvInput" placeholder="Id, X, Y, Rot..."></textarea>
+        
+        <button id="btnRender">RENDERIZAR TODO</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x181825);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 10, 200000);
+        camera.position.set(8000, 8000, 15000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5000, 20000, 5000);
+        scene.add(light);
+
+        let mainGroup = new THREE.Group();
+        scene.add(mainGroup);
+
+        const colors = [0x89b4fa, 0xf38ba8, 0xa6e3a1, 0xf9e2af, 0xcba6f7];
+
+        document.getElementById('btnRender').addEventListener('click', () => {
+            scene.remove(mainGroup);
+            mainGroup = new THREE.Group();
+            scene.add(mainGroup);
+
+            // 1. PINTAR PERÍMETRO (Warehouse)
+            const whPoints = [];
+            const whInput = document.getElementById('whText').value.trim();
+            if (whInput) {
+                whInput.split('\n').forEach(line => {
+                    const p = line.split(',').map(Number);
+                    if (p.length >= 2) whPoints.push(new THREE.Vector3(p[0], 0, p[1]));
+                });
+
+                if (whPoints.length > 2) {
+                    const geometry = new THREE.BufferGeometry().setFromPoints(whPoints);
+                    // LineLoop une el último punto con el primero automáticamente
+                    const line = new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ 
+                        color: 0xf5c2e7, // Color fucsia neón
+                        linewidth: 5 
+                    }));
+                    line.position.y = 5; // Un pelín elevado para evitar Z-fighting con el suelo
+                    mainGroup.add(line);
+                }
+            }
+
+            // Grid de referencia (Suelo base)
+            const helper = new THREE.GridHelper(20000, 40, 0x313244, 0x313244);
+            helper.position.set(5000, 0, 5000);
+            mainGroup.add(helper);
+
+            // 2. TECHO (Ceiling)
+            const ceilingPoints = [];
+            document.getElementById('ceilingText').value.split('\n').forEach(line => {
+                const p = line.split(',').map(Number);
+                if (p.length >= 2) ceilingPoints.push({x: p[0], h: p[1]});
+            });
+            ceilingPoints.sort((a,b) => a.x - b.x);
+
+            ceilingPoints.forEach((cp, i) => {
+                const startX = cp.x;
+                const endX = (i < ceilingPoints.length - 1) ? ceilingPoints[i+1].x : 15000;
+                const width = endX - startX;
+                // Dibujamos el techo como una placa fina transparente
+                const ceilGeo = new THREE.BoxGeometry(width, 20, 15000);
+                const ceilMesh = new THREE.Mesh(ceilGeo, new THREE.MeshStandardMaterial({ 
+                    color: 0x89b4fa, transparent: true, opacity: 0.1 
+                }));
+                ceilMesh.position.set(startX + width/2, cp.h, 7500);
+                mainGroup.add(ceilMesh);
+            });
+
+            // 3. BAYS
+            const bayTypes = {};
+            document.getElementById('baysText').value.split('\n').forEach(line => {
+                const p = line.split(',').map(Number);
+                if (p.length >= 5) bayTypes[p[0]] = { w: p[1], d: p[2], h: p[3] };
+            });
+
+            document.getElementById('csvInput').value.split('\n').forEach(line => {
+                const p = line.split(',').map(Number);
+                if (p.length >= 4 && bayTypes[p[0]]) {
+                    const id = p[0], x = p[1], z = p[2], rot = p[3];
+                    const b = bayTypes[id];
+                    let physW = (rot % 180 === 0) ? b.w : b.d;
+                    let physD = (rot % 180 === 0) ? b.d : b.w;
+
+                    const mesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(physW, b.h, physD),
+                        new THREE.MeshStandardMaterial({ color: colors[id % colors.length] })
+                    );
+                    mesh.position.set(x + physW/2, b.h/2, z + physD/2);
+                    
+                    const edges = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(mesh.geometry),
+                        new THREE.LineBasicMaterial({ color: 0x000000 })
+                    );
+                    mesh.add(edges);
+                    mainGroup.add(mesh);
+                }
+            });
+        });
+
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        animate();
+    </script>
+</body>
+</html>
