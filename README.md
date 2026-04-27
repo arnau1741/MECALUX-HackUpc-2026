@@ -70,7 +70,7 @@ g++ main.cc -o solver && ./solver > output.txt
 ### Visualize the solution
 
 Since the visualizer is a static HTML page, it does not require a web server or compilation step.
-1. Simply double-click the `visualizador.html` file in your file explorer, or open it directly in your web browser.
+1. Simply double-click the `visualizador.html` file in your file explorer, or open it directly in your web browser (http://localhost:8000/visualizador.html).
 2. Inside the viewer, paste the data from your `.csv` files into their respective sections: `warehouse`, `ceiling`, `obstacles`, and `baytypes`.
 3. In the section labeled `output`, paste the text you got from the terminal in step 2.
 4. The viewer will proceed to draw an interactive 3D floor plan of the warehouse with the provided information.
