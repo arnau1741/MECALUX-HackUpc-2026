@@ -37,10 +37,13 @@
         <label>2. Ceiling (Techo)</label>
         <textarea id="ceilingText" placeholder="X, Height..."></textarea>
 
-        <label>3. Bay Types</label>
+        <label>3. Obstacles (Obstáculos)</label>
+        <textarea id="obsText" placeholder="X, Y, W, D..."></textarea>
+
+        <label>4. Bay Types</label>
         <textarea id="baysText" placeholder="Id, W, D, H..."></textarea>
 
-        <label>4. C++ Output</label>
+        <label>5. C++ Output</label>
         <textarea id="csvInput" placeholder="Id, X, Y, Rot..."></textarea>
         
         <button id="btnRender">RENDERIZAR TODO</button>
@@ -124,6 +127,32 @@
                 ceilMesh.position.set(startX + width/2, cp.h, 7500);
                 mainGroup.add(ceilMesh);
             });
+
+            // 2.5 OBSTÁCULOS (Obstacles)
+            const obsInput = document.getElementById('obsText').value.trim();
+            if (obsInput) {
+                obsInput.split('\n').forEach(line => {
+                    const p = line.split(',').map(Number);
+                    if (p.length >= 4) {
+                        const x = p[0], z = p[1], w = p[2], d = p[3];
+                        // Altura fija arbitraria para visualizar el obstáculo en 3D
+                        const obsH = 3000; 
+                        const obsGeo = new THREE.BoxGeometry(w, obsH, d);
+                        const obsMesh = new THREE.Mesh(obsGeo, new THREE.MeshStandardMaterial({ 
+                            color: 0xf38ba8, transparent: true, opacity: 0.6 
+                        }));
+                        obsMesh.position.set(x + w/2, obsH/2, z + d/2);
+                        mainGroup.add(obsMesh);
+
+                        // Bordes para que se defina mejor
+                        const edges = new THREE.LineSegments(
+                            new THREE.EdgesGeometry(obsGeo),
+                            new THREE.LineBasicMaterial({ color: 0xff0000 })
+                        );
+                        obsMesh.add(edges);
+                    }
+                });
+            }
 
             // 3. BAYS
             const bayTypes = {};
